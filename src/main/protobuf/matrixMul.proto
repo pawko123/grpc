@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+option java_package = "org.example.grpc";
+
+service MatrixMultiplication {
+  rpc Multiply (MatrixMultiplicationRequest) returns (MatrixMultiplicationReply);
+}
+
+message Matrix {
+  repeated int32 data = 1;
+  int32 rows = 2;
+  int32 cols = 3;
+}
+
+message MatrixMultiplicationRequest {
+  Matrix matrixA = 1;
+  Matrix matrixB = 2;
+}
+
+message MatrixMultiplicationReply {
+  Matrix result = 1;
+}
