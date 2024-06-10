@@ -28,30 +28,93 @@ public class multiplyClient {
             System.out.println();
         }
     }
+    private static MatrixMul.Matrix[] splitMatrixA(MatrixMul.Matrix matrixA) {
+        int rows = matrixA.getRows();
+        int cols = matrixA.getCols();
+
+        int subMatrixCount = rows < 4 ? 1 : 4; // Handle small matrices directly
+        MatrixMul.Matrix[] subMatrices = new MatrixMul.Matrix[subMatrixCount];
+
+        for (int i = 0; i < subMatrixCount; i++) {
+            MatrixMul.Matrix.Builder builder = MatrixMul.Matrix.newBuilder();
+            int startRow = (i / 2) * (rows / 2);
+            int endRow = (i / 2 == 1) ? rows : startRow + (rows / 2);
+
+            builder.setRows(endRow - startRow);
+            builder.setCols(cols);
+
+            for (int r = startRow; r < endRow; r++) {
+                for (int c = 0; c < cols; c++) {
+                    builder.addData(matrixA.getData(r * cols + c));
+                }
+            }
+            subMatrices[i] = builder.build();
+        }
+
+        return subMatrices;
+    }
+
+    private static MatrixMul.Matrix combineMatrices(MatrixMul.MatrixMultiplicationReply[] replies, int totalRows, int totalCols) {
+        MatrixMul.Matrix.Builder builder = MatrixMul.Matrix.newBuilder();
+        builder.setRows(totalRows);
+        builder.setCols(totalCols);
+
+        for (int i = 0; i < totalRows * totalCols; i++) {
+            builder.addData(0);
+        }
+
+        int halfRows = totalRows / 2;
+
+        for (int i = 0; i < 4; i++) {
+            MatrixMul.Matrix subMatrix = replies[i].getResult();
+            for (int r = 0; r < subMatrix.getRows(); r++) {
+                for (int c = 0; c < subMatrix.getCols(); c++) {
+                    int globalRow = (i / 2) * halfRows + r;
+                    int globalCol = c;
+                    int globalIndex = globalRow * totalCols + globalCol;
+                    builder.setData(globalIndex, subMatrix.getData(r * subMatrix.getCols() + c));
+                }
+            }
+        }
+
+        return builder.build();
+    }
+
     public static void main(String[] args) {
-        ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", 5003)
-                .usePlaintext()
-                .build();
+        ManagedChannel[] channels = new ManagedChannel[4];
+        for (int i = 0; i < 4; i++) {
+            channels[i] = ManagedChannelBuilder.forAddress("localhost", 5001 + i)
+                    .usePlaintext()
+                    .build();
+        }
 
-        MatrixMultiplicationGrpc.MatrixMultiplicationBlockingStub stub = MatrixMultiplicationGrpc.newBlockingStub(channel);
 
-        MatrixMul.Matrix matrixA = generateRandomMatrix(5, 2);
-        MatrixMul.Matrix matrixB = generateRandomMatrix(2, 3);
+        MatrixMul.Matrix matrixA = generateRandomMatrix(10, 10);
+        MatrixMul.Matrix matrixB = generateRandomMatrix(10, 10);
+
+        MatrixMul.Matrix[] subMatricesA = splitMatrixA(matrixA);
+
+        MatrixMul.MatrixMultiplicationReply[] replies = new MatrixMul.MatrixMultiplicationReply[4];
+        for (int i = 0; i < 4; i++) {
+            MatrixMultiplicationGrpc.MatrixMultiplicationBlockingStub stub = MatrixMultiplicationGrpc.newBlockingStub(channels[i]);
+
+            MatrixMul.MatrixMultiplicationRequest request = MatrixMul.MatrixMultiplicationRequest.newBuilder()
+                    .setMatrixA(subMatricesA[i])
+                    .setMatrixB(matrixB)
+                    .build();
+
+            replies[i] = stub.multiply(request);
+        }
 
         System.out.println("Matrix A:");
         printMatrix(matrixA);
         System.out.println("Matrix B:");
         printMatrix(matrixB);
 
-        MatrixMul.MatrixMultiplicationRequest request = MatrixMul.MatrixMultiplicationRequest.newBuilder()
-                .setMatrixA(matrixA)
-                .setMatrixB(matrixB)
-                .build();
-
-        MatrixMul.MatrixMultiplicationReply reply = stub.multiply(request);
+        MatrixMul.Matrix resultMatrix = combineMatrices(replies, matrixA.getRows(), matrixB.getCols());
 
         System.out.println("The result matrix is: ");
 
-        printMatrix(reply.getResult());
+        printMatrix(resultMatrix);
     }
 }
