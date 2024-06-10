@@ -94,16 +94,29 @@ public class multiplyClient {
 
         MatrixMul.Matrix[] subMatricesA = splitMatrixA(matrixA);
 
+        Thread[] threads = new Thread[4];
         MatrixMul.MatrixMultiplicationReply[] replies = new MatrixMul.MatrixMultiplicationReply[4];
+
         for (int i = 0; i < 4; i++) {
-            MatrixMultiplicationGrpc.MatrixMultiplicationBlockingStub stub = MatrixMultiplicationGrpc.newBlockingStub(channels[i]);
+            final int index = i;
+            threads[i] = new Thread(() -> {
+                MatrixMultiplicationGrpc.MatrixMultiplicationBlockingStub stub = MatrixMultiplicationGrpc.newBlockingStub(channels[index]);
 
-            MatrixMul.MatrixMultiplicationRequest request = MatrixMul.MatrixMultiplicationRequest.newBuilder()
-                    .setMatrixA(subMatricesA[i])
-                    .setMatrixB(matrixB)
-                    .build();
+                MatrixMul.MatrixMultiplicationRequest request = MatrixMul.MatrixMultiplicationRequest.newBuilder()
+                        .setMatrixA(subMatricesA[index])
+                        .setMatrixB(matrixB)
+                        .build();
 
-            replies[i] = stub.multiply(request);
+                replies[index] = stub.multiply(request);
+            });
+            threads[i].start();
+        }
+        for(Thread t : threads) {
+            try {
+                t.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
 
         System.out.println("Matrix A:");
