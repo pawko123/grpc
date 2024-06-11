@@ -11,6 +11,9 @@ public class multiplyServerImpl extends MatrixMultiplicationGrpc.MatrixMultiplic
         MatrixMul.Matrix matrixA = request.getMatrixA();
         MatrixMul.Matrix matrixB = request.getMatrixB();
 
+        System.out.println("Matrix A:");
+        System.out.println(matrixA.getDataList());
+
        if(matrixA.getCols() != matrixB.getRows()){
             responseObserver.onError(new IllegalArgumentException("Columns of matrix A must be equal to rows of matrix B"));
             return;
@@ -18,6 +21,8 @@ public class multiplyServerImpl extends MatrixMultiplicationGrpc.MatrixMultiplic
 
         MatrixMul.Matrix result = multiplyMatrices(matrixA, matrixB);
         MatrixMul.MatrixMultiplicationReply reply = MatrixMul.MatrixMultiplicationReply.newBuilder().setResult(result).build();
+        System.out.println("Result:");
+        System.out.println(reply.getResult().getDataList());
         responseObserver.onNext(reply);
         responseObserver.onCompleted();
     }
